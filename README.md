@@ -1,4 +1,4 @@
-# Category Management API (Laravel 10)
+# Category Management (Laravel 10)
 
 This is a RESTful API built with Laravel 10 for managing a hierarchical category system. It includes full CRUD operations, tree view retrieval, search, filtering, pagination, and caching for optimal performance.
 
