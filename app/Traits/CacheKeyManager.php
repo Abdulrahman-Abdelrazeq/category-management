@@ -16,9 +16,14 @@ trait CacheKeyManager
      */
     public function storeCacheKey(string $cacheKey, string $listKey, \DateTimeInterface $ttl = null)
     {
+        // Get existing cache keys from the list, or an empty array if none exist
         $cacheKeys = Cache::get($listKey, []);
+
+        // Add the new key if it's not already in the list
         if (!in_array($cacheKey, $cacheKeys)) {
             $cacheKeys[] = $cacheKey;
+
+            // Store the updated list back in the cache with a TTL (default: 24 hours)
             Cache::put($listKey, $cacheKeys, $ttl ?? now()->addHours(24));
         }
     }
@@ -31,10 +36,13 @@ trait CacheKeyManager
      */
     public function invalidateCacheKeys(string $listKey)
     {
+        // Get the list of cache keys and delete each one
         $cacheKeys = Cache::get($listKey, []);
         foreach ($cacheKeys as $key) {
             Cache::forget($key);
         }
+
+        // Finally, remove the list key itself
         Cache::forget($listKey);
     }
 }

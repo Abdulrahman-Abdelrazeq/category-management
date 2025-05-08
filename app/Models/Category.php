@@ -12,7 +12,7 @@ class Category extends Model
 
     protected $fillable = ['name', 'parent_id'];
 
-    // إخفاء الأعمدة deleted_at, created_at, updated_at
+    // Hide columns deleted_at, created_at, updated_at
     protected $hidden = ['created_at', 'updated_at', 'deleted_at'];
 
     public function parent() {
@@ -23,6 +23,7 @@ class Category extends Model
         return $this->hasMany(Category::class, 'parent_id');
     }
 
+    // Defines a recursive relationship to get all descendants (children, grandchildren, etc.).
     public function childrenRecursive()
     {
         return $this->children()->with('childrenRecursive');

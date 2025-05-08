@@ -12,10 +12,16 @@ use App\Traits\Response;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use App\Services\CategoryService;
 
 class CategoryController extends Controller
 {
     use Response, CacheKeyManager;
+
+    public function __construct(CategoryService $categoryService)
+    {
+        $this->categoryService = $categoryService;
+    }
 
     /**
      * Display a listing of categories with optional search, filtering, and pagination.
@@ -26,7 +32,9 @@ class CategoryController extends Controller
     public function index(Request $request)
     {
         try {
+            // Extract query parameters
             $keyword = $request->query('keyword');
+            $parentId = $request->query('parent_id');
             $perPage = $request->query('per_page', 10);
             $validRelations = ['parent', 'children'];
             $with = array_intersect(explode(',', $request->query('with', '')), $validRelations);
@@ -37,6 +45,7 @@ class CategoryController extends Controller
             // Generate unique cache key based on request parameters
             $cacheKey = 'categories_index_' . md5(
                 $keyword . '|' .
+                $parentId . '|' .
                 $perPage . '|' .
                 implode(',', $with) . '|' .
                 ($parentOnly ? '1' : '0') . '|' .
@@ -49,6 +58,7 @@ class CategoryController extends Controller
 
             $data = Cache::remember($cacheKey, now()->addHours(1), function () use (
                 $keyword,
+                $parentId,
                 $perPage,
                 $with,
                 $parentOnly,
@@ -66,6 +76,11 @@ class CategoryController extends Controller
                               $q->where('name', 'like', "%$keyword%");
                           });
                     });
+                }
+
+                // Filter by parent ID
+                if ($parentId) {
+                    $query->where('parent_id', $parentId);
                 }
 
                 // Filter categories with children
@@ -142,6 +157,12 @@ class CategoryController extends Controller
     {
         try {
             $category->update($request->validated());
+            // Prevent setting a parent that would create a circular hierarchy
+            $parentId = $request->validated('parent_id');
+            if ($parentId && $this->categoryService->hasCircularDependency($parentId, $category->id)) {
+                return $this->sendRes(false, 'Cannot update category: Circular dependency detected', null, ['error' => ['The selected parent would create a circular reference']], 422);
+            }
+            
             $this->invalidateCacheKeys('categories_index_keys'); // Invalidate index cache
             Cache::forget('categories_tree'); // Invalidate tree cache
             return $this->sendRes(true, 'Category updated successfully', new CategoryResource($category->fresh()), null, 200);
@@ -159,9 +180,9 @@ class CategoryController extends Controller
     public function destroy(Category $category)
     {
         try {
-            if ($category->children()->exists()) {
-                return $this->sendRes(false, 'Cannot delete category with children', null, null, 400);
-            }
+            // Update subclasses to set parent_id to null
+            $category->children()->update(['parent_id' => null]);
+
             $category->delete();
             $this->invalidateCacheKeys('categories_index_keys'); // Invalidate index cache
             Cache::forget('categories_tree'); // Invalidate tree cache
@@ -181,9 +202,10 @@ class CategoryController extends Controller
     {
         try {
             $ids = $request->validated()['ids'];
-            if (Category::whereIn('id', $ids)->whereHas('children')->exists()) {
-                return $this->sendRes(false, 'Cannot delete categories with children', null, null, 400);
-            }
+
+            // Update subclasses to set parent_id to null for all selected classes
+            Category::whereIn('parent_id', $ids)->update(['parent_id' => null]);
+
             Category::whereIn('id', $ids)->delete();
             $this->invalidateCacheKeys('categories_index_keys'); // Invalidate index cache
             Cache::forget('categories_tree'); // Invalidate tree cache

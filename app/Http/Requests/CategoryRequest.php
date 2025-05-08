@@ -25,6 +25,7 @@ class CategoryRequest extends BaseFormRequest
             'name' => 'required|unique:categories,name',
             'parent_id' => ['nullable', Rule::exists('categories', 'id')->whereNull('deleted_at')]
         ];
+        // If the request is a PUT or PATCH request, we need to exclude the current category from the unique rule
         if ($this->isMethod('put') || $this->isMethod('patch')) {
             $rules['name'] .= ',' . $this->route('category')->id;
         }

@@ -20,5 +20,4 @@ Route::apiResource('categories', CategoryController::class);
 Route::prefix('categories-api')->controller(CategoryController::class)->group(function () {
     Route::post('/delete-multiple', 'destroyMultiple');
     Route::get('/tree', 'tree');
-    Route::get('/has-children', 'hasChildren');
 });

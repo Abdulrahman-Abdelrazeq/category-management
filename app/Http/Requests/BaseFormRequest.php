@@ -12,6 +12,7 @@ class BaseFormRequest extends FormRequest
     use Response;
     protected function failedValidation(Validator $validator)
     {
+        // Throw a custom HTTP response with validation errors and 422 Unprocessable Entity status
         throw new HttpResponseException($this->sendRes(false, 'Validation Error', null, $validator->errors(), 422));
     }
 }
